@@ -7,7 +7,7 @@ if [ -z "$1" ]
     exit 1
 fi
 
-export AWS_DEFAULT_REGION="us-east-2"
+export AWS_DEFAULT_REGION="us-east-1"
 
 python3 -m venv .venv
 . .venv/bin/activate
