@@ -7,11 +7,10 @@ if [ -z "$1" ]
     exit 1
 fi
 
-export AWS_DEFAULT_REGION="us-east-1"
+export AWS_DEFAULT_REGION="us-east-2"
 
 python3 -m venv .venv
 . .venv/bin/activate
 pip install -r requirements.txt
 
-#python infrastructure.py $1
-python infrastructure_nested.py $1
+python simple-infrastructure.py $1
