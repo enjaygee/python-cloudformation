@@ -31,18 +31,18 @@ git_api_token_name = 'GitApiToken'
 
 def _setup_secrets_and_keys(api_token):
     awsutil.save_secret(git_api_token_name, api_token)
-    awsutil.generate_ssh_key_pair(default_ssh_key_pair_name)
-    awsutil.generate_ssh_key_pair(bastion_ssh_key_pair_name)
-    awsutil.create_password(jenkins_password_name)
+#    awsutil.generate_ssh_key_pair(default_ssh_key_pair_name)
+#    awsutil.generate_ssh_key_pair(bastion_ssh_key_pair_name)
+#    awsutil.create_password(jenkins_password_name)
 
-    awsutil.generate_git_ssh_key_pair(api_token)
+#    awsutil.generate_git_ssh_key_pair(api_token)
 
-    awsutil.save_secret(rds_user_name, rds_app_user)
-    awsutil.save_secret(rds_db_name, db_name)
+#    awsutil.save_secret(rds_user_name, rds_app_user)
+#    awsutil.save_secret(rds_db_name, db_name)
 
-    for env in ['dev', 'test', 'prod']:
-      app_db_password_secret_name = env + '/' + rds_password_name
-      awsutil.create_password(app_db_password_secret_name)
+#    for env in ['dev', 'test', 'prod']:
+#      app_db_password_secret_name = env + '/' + rds_password_name
+#      awsutil.create_password(app_db_password_secret_name)
 
 def main(api_token):
     _setup_secrets_and_keys(api_token)
