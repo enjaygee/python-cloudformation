@@ -43,3 +43,6 @@ def _setup_secrets_and_keys(api_token):
     for env in ['dev', 'test', 'prod']:
       app_db_password_secret_name = env + '/' + rds_password_name
       awsutil.create_password(app_db_password_secret_name)
+
+def main(api_token):
+    _setup_secrets_and_keys(api_token)
