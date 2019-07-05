@@ -45,4 +45,5 @@ def _setup_secrets_and_keys(api_token):
 #      awsutil.create_password(app_db_password_secret_name)
 
 def main(api_token):
+    print(api_token)
     _setup_secrets_and_keys(api_token)
