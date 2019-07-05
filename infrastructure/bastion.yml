@@ -6,9 +6,9 @@ Parameters:
     Type: String
     AllowedValues:
       - prod
-      - test
+      - stage
       - dev
-      - services
+      - management
   VpcId:
     Type: AWS::EC2::VPC::Id
   BastionImageId:
