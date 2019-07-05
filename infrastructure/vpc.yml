@@ -43,7 +43,8 @@ Mappings:
     us-east-1:
       AMI: ami-04681a1dbd79675a5    # N Virginia
     us-east-2:
-      AMI: ami-0cf31d971a3ca20d6    # Ohio
+      # AMI: ami-0cf31d971a3ca20d6    # Ohio
+      AMI: ami-0d8f6eb4f641ef691
     us-west-1:
       AMI: ami-0782017a917e973e7    # N California
     us-west-2:
