@@ -91,24 +91,22 @@ def _setup_envs():
                 'ParameterKey': 'BastionTemplateUrl',
                 'ParameterValue': bastion_template_url
             },
-            {
-                'ParameterKey': 'RdsTemplateUrl',
-                'ParameterValue': rds_template_url
-            },
+#            {
+#                'ParameterKey': 'RdsTemplateUrl',
+#                'ParameterValue': rds_template_url
+#            },
             {
                 'ParameterKey': 'BastionKeyName',
                 'ParameterValue': bastion_ssh_key_pair_name
             },
-            {
-                'ParameterKey': 'DatabaseName',
-                'ParameterValue': db_name
-
-            },
-            {
-                'ParameterKey': 'DBMasterUsername',
-                'ParameterValue': rds_app_user
-
-            },
+#            {
+#                'ParameterKey': 'DatabaseName',
+#                'ParameterValue': db_name
+#            },
+#            {
+#                'ParameterKey': 'DBMasterUsername',
+#                'ParameterValue': rds_app_user
+#            },
 #            {
 #                'ParameterKey': 'JenkinsTemplateUrl',
 #                'ParameterValue': jenkins_template_url
