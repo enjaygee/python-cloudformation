@@ -9,6 +9,7 @@ fi
 
 export AWS_DEFAULT_REGION="us-east-1"
 
+# Open python virtual environment in directory ".venv".  See https://docs.python.org/3/library/venv.html
 python3 -m venv .venv
 . .venv/bin/activate
 pip install -r requirements.txt
