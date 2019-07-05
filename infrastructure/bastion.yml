@@ -1,0 +1,71 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Description: Template for Bastion Host
+Parameters:
+  EnvironmentName:
+    Type: String
+    AllowedValues:
+      - prod
+      - test
+      - dev
+      - services
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  BastionImageId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/amzn-ami-hvm-x86_64-ebs
+  BastionKeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: EC2 key used to connect to the bastion host
+  InstanceSubnet:
+    Description: subnet id of the existing virtual private cloud that bastion should be deployed to
+    Type: AWS::EC2::Subnet::Id
+  InstanceType:
+    Description: Jenkins EC2 instance type
+    Type: String
+    Default: t2.large
+    AllowedValues:
+      - t2.micro
+      - t2.small
+      - t2.medium
+      - t2.large
+Resources:
+  BastionSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub 'Bastion for ${AWS::StackName}'
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          FromPort: 0
+          ToPort: '65535'
+          IpProtocol: 'tcp'
+  Bastion:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref BastionImageId
+      InstanceType: !Ref InstanceType
+      SubnetId: !Ref InstanceSubnet
+      KeyName: !Ref BastionKeyName
+      Monitoring: false
+      SecurityGroupIds:
+        - !Ref BastionSecurityGroup
+      UserData: !Base64 'yum install mysql --assumeyes'
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-Bastion"
+Outputs:
+  EnvironmentName:
+    Value: !Ref EnvironmentName
+  BastionHost:
+    Value: !GetAtt Bastion.PublicDnsName
+    Export:
+      Name: !Sub '${AWS::StackName}BastionHost'
+  BastionIp:
+    Value: !GetAtt Bastion.PublicIp
+    Export:
+      Name: !Sub '${AWS::StackName}BastionIp'
+  BastionSecurityGroupId:
+    Value: !GetAtt BastionSecurityGroup.GroupId
+    Export:
+      Name: !Sub '${AWS::StackName}BastionSecurityGroupId'

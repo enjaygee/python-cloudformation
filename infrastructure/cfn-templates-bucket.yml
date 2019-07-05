@@ -1,0 +1,15 @@
+Description: >
+  This tempalte deploys a s3 bucket used for storing Cloudformation templates
+Resources:
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'cfn-templates-${AWS::AccountId}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+Outputs:
+  CfnTemplatesBucketName:
+    Description: Name of the created bucket
+    Value: !Ref S3Bucket

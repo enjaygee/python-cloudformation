@@ -1,0 +1,85 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  This template creates vpc peering
+Parameters:
+  VPC:
+    Description: peer requesting vpc id
+    Type: AWS::EC2::VPC::Id
+  VPCEnvironmentName:
+    Description: Environment name of the peer requesting vpc
+    Type: String
+  VPCCidrBlock:
+    Description: peer requesting vpc cidr block
+    Type: String
+  VPCPublicRouteTable:
+    Description: peer requesting vpc public route table
+    Type: String
+  VPCPrivateRouteTable1:
+    Description: peer requesting vpc private route table 1
+    Type: String
+  VPCPrivateRouteTable2:
+    Description: peer requesting vpc private route table 2
+    Type: String
+  PeeredVPC:
+    Description: peered vpc id
+    Type: AWS::EC2::VPC::Id
+  PeeredVPCEnvironmentName:
+    Description: Environment name of the peered vpc
+    Type: String
+  PeeredVPCCidrBlock:
+    Description: peered vpc cidr block
+    Type: String
+  PeeredVPCPublicRouteTable:
+    Description: peered vpc public route table
+    Type: String
+  PeeredVPCPrivateRouteTable1:
+    Description: peered vpc private route table 1
+    Type: String
+  PeeredVPCPrivateRouteTable2:
+    Description: peered vpc private route table 2
+    Type: String
+Resources:
+  VPCPeering:
+    Type: AWS::EC2::VPCPeeringConnection
+    Properties:
+      VpcId: !Ref VPC
+      PeerVpcId: !Ref PeeredVPC
+      Tags:
+        - Key: "Name"
+          Value: !Sub "${VPCEnvironmentName}-to-${PeeredVPCEnvironmentName}"
+  VPCToPeeredVPCPublicRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: !Ref PeeredVPCCidrBlock
+      RouteTableId: !Ref VPCPublicRouteTable
+      VpcPeeringConnectionId: !Ref VPCPeering
+  VPCToPeeredVPCPrivate1Route:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: !Ref PeeredVPCCidrBlock
+      RouteTableId: !Ref VPCPrivateRouteTable1
+      VpcPeeringConnectionId: !Ref VPCPeering
+  VPCToPeeredVPCPrivate2Route:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: !Ref PeeredVPCCidrBlock
+      RouteTableId: !Ref VPCPrivateRouteTable2
+      VpcPeeringConnectionId: !Ref VPCPeering
+  PeeredVPCToVPCPublicRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: !Ref VPCCidrBlock
+      RouteTableId: !Ref PeeredVPCPublicRouteTable
+      VpcPeeringConnectionId: !Ref VPCPeering
+  PeeredVPCToVPCPrivate1Route:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: !Ref VPCCidrBlock
+      RouteTableId: !Ref PeeredVPCPrivateRouteTable1
+      VpcPeeringConnectionId: !Ref VPCPeering
+  PeeredVPCToVPCPrivate2Route:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: !Ref VPCCidrBlock
+      RouteTableId: !Ref PeeredVPCPrivateRouteTable2
+      VpcPeeringConnectionId: !Ref VPCPeering

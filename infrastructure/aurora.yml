@@ -1,0 +1,73 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: Aurora serverless cluster
+
+Parameters:
+  EnvrionmentName:
+    Type: String
+    AllowedValues:
+      - prod
+      - test
+      - dev
+  DatabaseName:
+    Type: String
+  EngineVersion:
+    Type: String
+    Default: '5.6'
+  MasterUsername:
+    Type: String
+    Default: mdas
+  MasterUserPassword:
+    Type: String
+    NoEcho: true
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  Subnets:
+    Description: Choose which subnets the cluster should be deployed
+    Type: List<AWS::EC2::Subnet::Id>
+Resources:
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub 'SG for ${AWS::StackName}'
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          FromPort: 3306
+          ToPort: 3306
+          IpProtocol: 'tcp'
+  DBSubnetGroup:
+    Type: "AWS::RDS::DBSubnetGroup"
+    Properties:
+      DBSubnetGroupDescription: db subnet group for db cluster
+      SubnetIds: !Ref Subnets
+
+  Cluster:
+    Type: AWS::RDS::DBCluster
+    Properties:
+      Engine: aurora
+      EngineMode: serverless
+      EngineVersion: !Ref EngineVersion
+      DatabaseName: !Ref DatabaseName
+      MasterUsername: !Ref MasterUsername
+      MasterUserPassword: !Ref MasterUserPassword
+      DBClusterIdentifier: !Ref AWS::StackName
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      BackupRetentionPeriod: 35
+      DeletionProtection: true
+      ScalingConfiguration:
+          AutoPause: false
+          MaxCapacity: 32
+          MinCapacity: 16
+      VpcSecurityGroupIds:
+        - !Ref SecurityGroup
+Outputs:
+  Host:
+    Value: !GetAtt Cluster.Endpoint.Address
+    Export:
+      Name: !Sub '${AWS::StackName}Host'
+  Name:
+    Value: !Ref DatabaseName
+    Export:
+      Name: !Sub '${AWS::StackName}Name'

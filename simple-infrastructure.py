@@ -40,6 +40,8 @@ def _setup_secrets_and_keys():
 
 def main():
     _setup_secrets_and_keys()
+    # check formatting of all CloudFormation templates in the infrastructure directory
+    awsutil.validate_cfn_templates('infrastructure')
 
 
 if __name__ == '__main__':

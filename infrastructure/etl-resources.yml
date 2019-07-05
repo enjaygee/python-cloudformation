@@ -1,0 +1,23 @@
+Description: This tempalte deploys resources needed for execution SageMaker training and deploying models
+Parameters:
+  EnvironmentName:
+    Description: An environment name that will be prefixed to resource names
+    Type: String
+    AllowedValues:
+      - prod
+      - test
+      - dev
+Resources:
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${EnvironmentName}-etl-${AWS::Region}-${AWS::AccountId}"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+Outputs:
+  EtlBucketName:
+    Description: Name of the created bucket
+    Value: !Ref S3Bucket

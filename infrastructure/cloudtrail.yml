@@ -1,0 +1,101 @@
+Description: >
+    This template deploys cloud trail
+Resources:
+    S3Bucket:
+      DeletionPolicy: Retain
+      Type: "AWS::S3::Bucket"
+      Properties: {}
+    BucketPolicy:
+      Type: "AWS::S3::BucketPolicy"
+      Properties:
+        Bucket:
+          Ref: S3Bucket
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            -
+              Sid: "AWSCloudTrailAclCheck"
+              Effect: "Allow"
+              Principal:
+                Service: "cloudtrail.amazonaws.com"
+              Action: "s3:GetBucketAcl"
+              Resource:
+                !Sub |-
+                  arn:aws:s3:::${S3Bucket}
+            -
+              Sid: "AWSCloudTrailWrite"
+              Effect: "Allow"
+              Principal:
+                Service: "cloudtrail.amazonaws.com"
+              Action: "s3:PutObject"
+              Resource:
+                !Sub |-
+                  arn:aws:s3:::${S3Bucket}/AWSLogs/${AWS::AccountId}/*
+              Condition:
+                StringEquals:
+                  s3:x-amz-acl: "bucket-owner-full-control"
+    myTrailCloudWatchLogGroup:
+      Type: "AWS::Logs::LogGroup"
+      Properties:
+        LogGroupName: "CloudTrail/DefaultLogGroup"
+
+    myTrailCloudWatchLogsRole:
+      Type: "AWS::IAM::Role"
+      Properties:
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            -
+              Effect: "Allow"
+              Principal:
+                Service:
+                  - "cloudtrail.amazonaws.com"
+              Action:
+                - "sts:AssumeRole"
+        Path: "/"
+    myTrailCloudWatchLogsRolePolicies:
+      Type: "AWS::IAM::Policy"
+      Properties:
+        PolicyName: "myTrailCloudWatchLogsRolePolicies"
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            -
+              Sid: "AWSCloudTrailCreateLogStream2014110"
+              Effect: "Allow"
+              Action:
+                - "logs:CreateLogStream"
+              Resource:
+                - !GetAtt myTrailCloudWatchLogGroup.Arn
+            -
+              Sid: "AWSCloudTrailPutLogEvents20141101"
+              Effect: "Allow"
+              Action:
+                - "logs:PutLogEvents"
+              Resource:
+                - !GetAtt myTrailCloudWatchLogGroup.Arn
+        Roles:
+          -
+            Ref: "myTrailCloudWatchLogsRole"
+    myTrail:
+      DependsOn:
+        - BucketPolicy
+      Type: "AWS::CloudTrail::Trail"
+      Properties:
+        S3BucketName:
+          Ref: S3Bucket
+        CloudWatchLogsLogGroupArn: !GetAtt myTrailCloudWatchLogGroup.Arn
+        CloudWatchLogsRoleArn: !GetAtt myTrailCloudWatchLogsRole.Arn
+        IsLogging: true
+        IncludeGlobalServiceEvents: true
+        IsMultiRegionTrail: true
+        EventSelectors:
+          - DataResources:
+              - Type: "AWS::S3::Object"
+                Values:
+                  - "arn:aws:s3:::"
+              - Type: "AWS::Lambda::Function"
+                Values:
+                  - "arn:aws:lambda"
+            IncludeManagementEvents: true
+            ReadWriteType: "All"

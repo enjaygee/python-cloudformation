@@ -1,0 +1,385 @@
+Description: >
+
+  This template deploys dev/test/prod/services VPCs, with a pair of public and private subnets spread
+  across two Availabilty Zones in each vpc. For a vpc, it deploys an Internet Gateway, with a default
+  route on the public subnets. It deploys a pair of NAT instances (one in each AZ),
+  and default routes for them in the private subnets.
+
+  It also deploys a Jenkins instance used for building CI/CD pipelines.
+
+Parameters:
+  VpcTemplateUrl:
+    Type: String
+    Description: Url for vpc template stored in s3 bucket
+  VpcPeeringTemplateUrl:
+    Type: String
+    Description: VPC peering template stored in s3 bucket
+  BastionTemplateUrl:
+    Type: String
+    Description: Url for vpc template stored in s3 bucket
+  BastionKeyName:
+    Type: String
+    Description: Bastion ssh key name
+    Default: BastionKey
+  RdsTemplateUrl:
+    Type: String
+    Description: Url for rds template stored in s3 bucket
+  DatabaseName:
+    Type: String
+    Description: Database name
+  DBMasterUsername:
+    Type: String
+    Description: DB master user name
+  JenkinsTemplateUrl:
+    Type: String
+    Description: Jenkins template stored in s3 bucket
+  JenkinsUser:
+    Type: String
+    Description: Jenkins user name
+    Default: jenkins
+  DefaultSSHKey:
+    Type: String
+    Description: Default ssh key name
+  GitRepo:
+    Type: String
+    Description: git repo
+  GitBranch:
+    Type: String
+    Description: default branch to use
+    Default: master
+  EtlResourcesTemplateUrl:
+    Type: String
+    Description: Url for etl resources template stored in s3 bucket
+  WebAppResourcesTemplateUrl:
+    Type: String
+    Description: Url for webapp template stored in s3 bucket
+  SamTemplateUrl:
+    Type: String
+    Description: Url for serverless application model template stored in s3 bucket
+  SagemakerResourcesTemplateUrl:
+    Type: String
+    Description: Url for Sagemaker resources template stored in s3 bucket
+  # GitUserName:
+  #   Type: String
+  #   Description: default service account user name for interacting with git repo
+Resources:
+  ServicesVPC:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Ref VpcTemplateUrl
+      Parameters:
+        EnvironmentName: services
+  DevVPC:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Ref VpcTemplateUrl
+      Parameters:
+        EnvironmentName: dev
+  TestVPC:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Ref VpcTemplateUrl
+      Parameters:
+        EnvironmentName: test
+  ProdVPC:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Ref VpcTemplateUrl
+      Parameters:
+        EnvironmentName: prod
+  ServiceToDevVPCPeering:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Ref VpcPeeringTemplateUrl
+      Parameters:
+        VPC: !GetAtt ServicesVPC.Outputs.VPC
+        VPCEnvironmentName: services
+        VPCCidrBlock: !GetAtt ServicesVPC.Outputs.VPCCIDR
+        VPCPublicRouteTable: !GetAtt ServicesVPC.Outputs.PublicRouteTable
+        VPCPrivateRouteTable1: !GetAtt ServicesVPC.Outputs.PrivateRouteTable1
+        VPCPrivateRouteTable2: !GetAtt ServicesVPC.Outputs.PrivateRouteTable2
+        PeeredVPC: !GetAtt DevVPC.Outputs.VPC
+        PeeredVPCEnvironmentName: dev
+        PeeredVPCCidrBlock: !GetAtt DevVPC.Outputs.VPCCIDR
+        PeeredVPCPublicRouteTable: !GetAtt DevVPC.Outputs.PublicRouteTable
+        PeeredVPCPrivateRouteTable1: !GetAtt DevVPC.Outputs.PrivateRouteTable1
+        PeeredVPCPrivateRouteTable2: !GetAtt DevVPC.Outputs.PrivateRouteTable2
+  ServiceToTestVPCPeering:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Ref VpcPeeringTemplateUrl
+      Parameters:
+        VPC: !GetAtt ServicesVPC.Outputs.VPC
+        VPCEnvironmentName: services
+        VPCCidrBlock: !GetAtt ServicesVPC.Outputs.VPCCIDR
+        VPCPublicRouteTable: !GetAtt ServicesVPC.Outputs.PublicRouteTable
+        VPCPrivateRouteTable1: !GetAtt ServicesVPC.Outputs.PrivateRouteTable1
+        VPCPrivateRouteTable2: !GetAtt ServicesVPC.Outputs.PrivateRouteTable2
+        PeeredVPC: !GetAtt TestVPC.Outputs.VPC
+        PeeredVPCEnvironmentName: test
+        PeeredVPCCidrBlock: !GetAtt TestVPC.Outputs.VPCCIDR
+        PeeredVPCPublicRouteTable: !GetAtt TestVPC.Outputs.PublicRouteTable
+        PeeredVPCPrivateRouteTable1: !GetAtt TestVPC.Outputs.PrivateRouteTable1
+        PeeredVPCPrivateRouteTable2: !GetAtt TestVPC.Outputs.PrivateRouteTable2
+  ServiceToProdVPCPeering:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Ref VpcPeeringTemplateUrl
+      Parameters:
+        VPC: !GetAtt ServicesVPC.Outputs.VPC
+        VPCEnvironmentName: services
+        VPCCidrBlock: !GetAtt ServicesVPC.Outputs.VPCCIDR
+        VPCPublicRouteTable: !GetAtt ServicesVPC.Outputs.PublicRouteTable
+        VPCPrivateRouteTable1: !GetAtt ServicesVPC.Outputs.PrivateRouteTable1
+        VPCPrivateRouteTable2: !GetAtt ServicesVPC.Outputs.PrivateRouteTable2
+        PeeredVPC: !GetAtt ProdVPC.Outputs.VPC
+        PeeredVPCEnvironmentName: prod
+        PeeredVPCCidrBlock: !GetAtt ProdVPC.Outputs.VPCCIDR
+        PeeredVPCPublicRouteTable: !GetAtt ProdVPC.Outputs.PublicRouteTable
+        PeeredVPCPrivateRouteTable1: !GetAtt ProdVPC.Outputs.PrivateRouteTable1
+        PeeredVPCPrivateRouteTable2: !GetAtt ProdVPC.Outputs.PrivateRouteTable2
+  Bastion:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Ref BastionTemplateUrl
+      Parameters:
+        EnvironmentName: services
+        VpcId: !GetAtt ServicesVPC.Outputs.VPC
+        InstanceSubnet: !GetAtt ServicesVPC.Outputs.PublicSubnet1
+        BastionKeyName: !Ref BastionKeyName
+  Jenkins:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Ref JenkinsTemplateUrl
+      Parameters:
+        EnvironmentName: services
+        KeyName: !Ref DefaultSSHKey
+        VpcId: !GetAtt ServicesVPC.Outputs.VPC
+        LBSubnets: !GetAtt ServicesVPC.Outputs.PublicSubnets
+        #InstanceSubnet: !GetAtt ServicesVPC.Outputs.PublicSubnet1
+        InstanceSubnet: !GetAtt ServicesVPC.Outputs.PrivateSubnet1
+        JenkinsUser: !Ref JenkinsUser
+        JenkinsCookbookRepo: !Ref GitRepo
+        GitBranch: !Ref GitBranch
+        GitRepo: !Ref GitRepo
+  DevRDS:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Ref RdsTemplateUrl
+      Parameters:
+        EnvironmentName: dev
+        DatabaseName: !Ref DatabaseName
+        MasterUsername: !Ref DBMasterUsername
+        MasterUserPasswordSecretName: 'dev/RdsPassword'
+        VpcId: !GetAtt DevVPC.Outputs.VPC
+        Subnets: !GetAtt DevVPC.Outputs.PrivateSubnets
+        PubliclyAccessible: false
+  TestRDS:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Ref RdsTemplateUrl
+      Parameters:
+        EnvironmentName: test
+        DatabaseName: !Ref DatabaseName
+        MasterUsername: !Ref DBMasterUsername
+        MasterUserPasswordSecretName: 'test/RdsPassword'
+        VpcId: !GetAtt TestVPC.Outputs.VPC
+        Subnets: !GetAtt TestVPC.Outputs.PrivateSubnets
+        PubliclyAccessible: false
+  ProdRDS:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Ref RdsTemplateUrl
+      Parameters:
+        EnvironmentName: prod
+        DatabaseName: !Ref DatabaseName
+        MasterUsername: !Ref DBMasterUsername
+        MasterUserPasswordSecretName: 'prod/RdsPassword'
+        VpcId: !GetAtt ProdVPC.Outputs.VPC
+        Subnets: !GetAtt ProdVPC.Outputs.PrivateSubnets
+        PubliclyAccessible: false
+  DevEtlResources:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Ref EtlResourcesTemplateUrl
+      Parameters:
+        EnvironmentName: dev
+  TestEtlResources:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Ref EtlResourcesTemplateUrl
+      Parameters:
+        EnvironmentName: test
+  ProdEtlResources:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Ref EtlResourcesTemplateUrl
+      Parameters:
+        EnvironmentName: prod
+  DevWebStaticHosting:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Ref WebAppResourcesTemplateUrl
+      Parameters:
+        Environment: dev
+  TestWebStaticHosting:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Ref WebAppResourcesTemplateUrl
+      Parameters:
+        Environment: test
+  ProdWebStaticHosting:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Ref WebAppResourcesTemplateUrl
+      Parameters:
+        Environment: prod
+
+  DevSAM:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Ref SamTemplateUrl
+      Parameters:
+        Environment: dev
+        VpcId: !GetAtt DevVPC.Outputs.VPC
+        VpcCidrBlock: !GetAtt DevVPC.Outputs.VPCCIDR
+  TestSAM:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Ref SamTemplateUrl
+      Parameters:
+        Environment: test
+        VpcId: !GetAtt TestVPC.Outputs.VPC
+        VpcCidrBlock: !GetAtt TestVPC.Outputs.VPCCIDR
+  ProdSAM:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Ref SamTemplateUrl
+      Parameters:
+        Environment: prod
+        VpcId: !GetAtt ProdVPC.Outputs.VPC
+        VpcCidrBlock: !GetAtt ProdVPC.Outputs.VPCCIDR
+  DevSagemakerResources:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Ref SagemakerResourcesTemplateUrl
+      Parameters:
+        EnvironmentName: dev
+        VpcId: !GetAtt DevVPC.Outputs.VPC
+  TestSagemakerResources:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Ref SagemakerResourcesTemplateUrl
+      Parameters:
+        EnvironmentName: test
+        VpcId: !GetAtt TestVPC.Outputs.VPC
+  ProdSagemakerResources:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Ref SagemakerResourcesTemplateUrl
+      Parameters:
+        EnvironmentName: prod
+        VpcId: !GetAtt ProdVPC.Outputs.VPC
+
+Outputs:
+  devEtlBucketName:
+    Description: Name of the created bucket
+    Value: !GetAtt DevEtlResources.Outputs.EtlBucketName
+  testEtlBucketName:
+    Description: Name of the created bucket
+    Value: !GetAtt TestEtlResources.Outputs.EtlBucketName
+  prodEtlBucketName:
+    Description: Name of the created bucket
+    Value: !GetAtt ProdEtlResources.Outputs.EtlBucketName
+  devSagemakerBucketName:
+    Description: Name of the created bucket
+    Value: !GetAtt DevSagemakerResources.Outputs.SagemakerBucketName
+  testSagemakerBucketName:
+    Description: Name of the created bucket
+    Value: !GetAtt TestSagemakerResources.Outputs.SagemakerBucketName
+  prodSagemakerBucketName:
+    Description: Name of the created bucket
+    Value: !GetAtt ProdSagemakerResources.Outputs.SagemakerBucketName
+  devPrivateSubnet1:
+    Description: dev private subnet 1
+    Value: !GetAtt DevVPC.Outputs.PrivateSubnet1
+  devPrivateSubnet1:
+    Description: dev private subnet 2
+    Value: !GetAtt DevVPC.Outputs.PrivateSubnet2
+  devPublicSubnet1:
+    Description: dev public subnet 1
+    Value: !GetAtt DevVPC.Outputs.PublicSubnet1
+  devPublicSubnet2:
+    Description: dev public subnet 2
+    Value: !GetAtt DevVPC.Outputs.PublicSubnet2
+  devPrivateSubnets:
+    Description: dev public subnets
+    Value: !GetAtt DevVPC.Outputs.PrivateSubnets
+  devPublicSubnets:
+    Description: dev public subnets
+    Value: !GetAtt DevVPC.Outputs.PublicSubnets
+  devSageMakerSecurityGroupId:
+    Description: dev sagemaker security group id
+    Value: !GetAtt DevSagemakerResources.Outputs.SageMakerSecurityGroupId
+  devRdsHost:
+    Description: dev RDS host
+    Value: !GetAtt DevRDS.Outputs.Host
+  testPrivateSubnet1:
+    Description: test private subnet 1
+    Value: !GetAtt TestVPC.Outputs.PrivateSubnet1
+  testPrivateSubnet1:
+    Description: test private subnet 2
+    Value: !GetAtt TestVPC.Outputs.PrivateSubnet2
+  testPublicSubnet1:
+    Description: test public subnet 1
+    Value: !GetAtt TestVPC.Outputs.PublicSubnet1
+  testPublicSubnet2:
+    Description: test public subnet 2
+    Value: !GetAtt TestVPC.Outputs.PublicSubnet2
+  testPrivateSubnets:
+    Description: test public subnets
+    Value: !GetAtt TestVPC.Outputs.PrivateSubnets
+  testPublicSubnets:
+    Description: test public subnets
+    Value: !GetAtt TestVPC.Outputs.PublicSubnets
+  testSageMakerSecurityGroupId:
+    Description: test sagemaker security group id
+    Value: !GetAtt TestSagemakerResources.Outputs.SageMakerSecurityGroupId
+  testRdsHost:
+    Description: test RDS host
+    Value: !GetAtt TestRDS.Outputs.Host
+  prodPrivateSubnet1:
+    Description: prod private subnet 1
+    Value: !GetAtt ProdVPC.Outputs.PrivateSubnet1
+  prodPrivateSubnet1:
+    Description: prod private subnet 2
+    Value: !GetAtt ProdVPC.Outputs.PrivateSubnet2
+  prodPublicSubnet1:
+    Description: prod public subnet 1
+    Value: !GetAtt ProdVPC.Outputs.PublicSubnet1
+  prodPublicSubnet2:
+    Description: prod public subnet 2
+    Value: !GetAtt ProdVPC.Outputs.PublicSubnet2
+  prodPrivateSubnets:
+    Description: prod public subnets
+    Value: !GetAtt ProdVPC.Outputs.PrivateSubnets
+  prodPublicSubnets:
+    Description: prod public subnets
+    Value: !GetAtt ProdVPC.Outputs.PublicSubnets
+  prodSageMakerSecurityGroupId:
+    Description: prod sagemaker security group id
+    Value: !GetAtt ProdSagemakerResources.Outputs.SageMakerSecurityGroupId
+  prodRdsHost:
+    Description: prod RDS host
+    Value: !GetAtt ProdRDS.Outputs.Host
+  BuildArtifactsBucket:
+    Description: build artifact bucket
+    Value: !GetAtt Jenkins.Outputs.BuildArtifactsBucket
+  JenkinsUrl:
+    Description: build artifact bucket
+    Value: !GetAtt Jenkins.Outputs.JenkinsUrl
+
+
+  # EcsListenerArn:
+  #   Description: ECS ALB listener ARN
+  #   Value: !GetAtt ALB.Outputs.Listener

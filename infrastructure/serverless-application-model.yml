@@ -1,0 +1,77 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description:
+  Creates a static website using S3 for the Dragonserverless web application workshop
+
+Parameters:
+  CodeBucket:
+    Type: String
+    Default: icf-dragon-challenge-us-east-1
+    Description: S3 bucket containing the code deployed by this template
+    AllowedPattern: ^[a-z0-9][a-z0-9-.]{1,61}[a-z0-9]$
+
+  CodeKeyPrefix:
+    Type: String
+    Default: WebApplication/1_StaticWebHosting
+    Description: Key prefix for resources referenced from the CodeBucket
+
+  Environment:
+    Type: String
+    Default: dev
+    Description: Environment to deploy
+
+  VpcId:
+    Type: String
+    Default: dev
+    Description: Environment to deploy
+
+  VpcCidrBlock:
+    Type: String
+    Description: CIDR range of VPC
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: "Website Configuration"
+        Parameters:
+          - BucketName
+      -
+        Label:
+          default: "Advanced Configuration"
+        Parameters:
+          - CodeBucket
+          - CodeKeyPrefix
+    ParameterLabels:
+      BucketName:
+        default: "Website Bucket Name"
+
+Resources:
+  LambdaBucket:
+    Properties:
+      BucketName: !Join
+                    - ''
+                    - - !Ref Environment
+                      - "-"
+                      - "sam-api"
+                      - "-"
+                      - !Ref AWS::AccountId
+    Type: "AWS::S3::Bucket"
+  LambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub 'SG for ${AWS::StackName}'
+      VpcId: !Ref VpcId
+      SecurityGroupEgress:
+        - CidrIp: 0.0.0.0/0
+          FromPort: 0
+          ToPort: 65535
+          IpProtocol: 'tcp'
+Outputs:
+  BucketName:
+    Description: Name of bucket
+    Value: !Ref LambdaBucket
+  LambdaSecurityGroup:
+    Value: !GetAtt LambdaSecurityGroup.GroupId

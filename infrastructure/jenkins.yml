@@ -1,0 +1,363 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AWS CloudFormation template that will deploy Jenkins ec2 instance configured by Chef'
+Parameters:
+  EnvironmentName:
+    Description: name of the env
+    Type: String
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instances
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: must be the name of an existing EC2 KeyPair.
+  VpcId:
+    Description: vpc id of the existing virtual private cloud
+    Type: AWS::EC2::VPC::Id
+    ConstraintDescription: must be the id of an existing vpc
+  LBSubnets:
+    Description: Choose which subnets the Application Load Balancer should be deployed to
+    Type: List<AWS::EC2::Subnet::Id>
+  InstanceSubnet:
+    Description: subnet id of the existing virtual private cloud that Jenkins should be deployed to
+    Type: AWS::EC2::Subnet::Id
+    ConstraintDescription: must be the id of an existing subnet
+  InstanceType:
+    Description: Jenkins EC2 instance type
+    Type: String
+    Default: t2.large
+    AllowedValues:
+      - t2.micro
+      - t2.small
+      - t2.medium
+      - t2.large
+      - t3.medium
+      - t3.large
+    ConstraintDescription: must be a valid EC2 instance type.
+  ImageId:
+    Description: Latest Amazon2 ami AMI ID
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+  JenkinsPort:
+    Default: 8080
+    Description: The Jenkins Port
+    Type: Number
+    MinValue: 0
+    MaxValue: 65535
+    ConstraintDescription: TCP ports must be between 0 - 65535
+  JenkinsUser:
+    Description: Jenkins user name
+    Type: String
+  JenkinsVersion:
+    Description: Version of Jenkins to use
+    Type: String
+    Default: "2.164.3"
+  # JenkinsPassword:
+  #   Description: Jenkins password
+  #   Type: String
+#    Default: '{{resolve:secretsmanager:JenkinsPassword}}'
+    # NoEcho: true
+  GitBranch:
+    Description: Name of Branch to use
+    Type: String
+    Default: "master"
+  GitRepo:
+    Description: Git repo to use
+    Type: String
+  JenkinsCookbookRepo:
+    Description: git repo containing jenkins config cookbooks
+    Type: String
+Resources:
+  JenkinsLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Subnets: !Ref LBSubnets
+      SecurityGroups:
+        - !Ref JenkinsLBSecurityGroup
+      Tags:
+        - Key: Name
+          Value: Jenkins-LoadBalancer
+
+  JenkinsLoadBalancerListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref JenkinsLoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref JenkinsTargetGroup
+
+  # We define a default target group here, as this is a mandatory Parameters
+  # when creating an Application Load Balancer Listener. This is not used, instead
+  # a target group is created per-service in each service template (../services/*)
+  JenkinsTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      VpcId: !Ref VpcId
+      Port: 80
+      Protocol: HTTP
+      Matcher:
+        HttpCode: 200-299
+      HealthCheckIntervalSeconds: 10
+      HealthCheckPath: /login
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      TargetGroupAttributes:
+      - Key: deregistration_delay.timeout_seconds
+        Value: '25'
+      Targets:
+      - Id: !Ref Jenkins
+        Port: 8080
+
+  JenkinsLBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable HTTP access via port Jenkins port locked down to the load balancer + SSH access
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: !Ref JenkinsPort
+          CidrIp: '0.0.0.0/0'
+
+  JenkinsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable HTTP access via Jenkins port locked down to the load balancer + SSH access
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: !Ref JenkinsPort
+          ToPort: !Ref JenkinsPort
+          SourceSecurityGroupId: !Ref "JenkinsLBSecurityGroup"
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: '0.0.0.0/0'
+
+  JenkinsRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "ec2.amazonaws.com"
+                - "sagemaker.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: "/"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AmazonEC2FullAccess"
+        - "arn:aws:iam::aws:policy/AmazonRDSFullAccess"
+        - "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+        - "arn:aws:iam::aws:policy/CloudWatchFullAccess"
+        - "arn:aws:iam::aws:policy/AmazonElasticMapReduceFullAccess"
+        - "arn:aws:iam::aws:policy/AmazonSageMakerFullAccess"
+        - "arn:aws:iam::aws:policy/AWSLambdaFullAccess"
+        - "arn:aws:iam::aws:policy/AmazonAPIGatewayAdministrator"
+  JenkinsRolePolicies:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyName: "jenkins_policy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Action:
+              - "es:*"
+              - "cloudformation:*"
+              - "sns:*"
+              - "sqs:*"
+              - "ses:*"
+              - "route53:*"
+              - "iam:*"
+              - "codepipeline:*"
+              - "codedeploy:*"
+              - "ssm:*"
+              - "secretsmanager:*"
+              - "ecr:*"
+              - "ecs:*"
+              - "sts:GetFederationToken"
+              - "sts:GetCallerIdentity"
+            Resource: "*"
+      Roles:
+        -
+          Ref: "JenkinsRole"
+  JenkinsInstanceProfile:
+    Type: "AWS::IAM::InstanceProfile"
+    Properties:
+      Path: "/"
+      Roles:
+        -
+          Ref: "JenkinsRole"
+  Jenkins:
+    Type: AWS::EC2::Instance
+    Metadata:
+      AWS::CloudFormation::Init:
+        configSets:
+          jenkins_install:
+            - install_cfn
+            - setup_jenkins
+        install_cfn:
+          files:
+            /etc/cfn/cfn-hup.conf:
+              content: !Join ['', ['[main]
+
+                    ', stack=, !Ref 'AWS::StackId', '
+
+                    ', region=, !Ref 'AWS::Region', '
+
+                    ']]
+              mode: '000400'
+              owner: root
+              group: root
+            /etc/cfn/hooks.d/cfn-auto-reloader.conf:
+              content: !Join ['', ['[cfn-auto-reloader-hook]
+
+                    ', 'triggers=post.update
+
+                    ', 'path=Resources.Jenkins.Metadata.AWS::CloudFormation::Init
+
+                    ', 'action=/opt/aws/bin/cfn-init -v ', '         --stack ', !Ref 'AWS::StackName',
+                  '         --resource Jenkins ', '         --configsets jenkins_install ',
+                  '         --region ', !Ref 'AWS::Region', '
+
+                    ']]
+              mode: '000400'
+              owner: root
+              group: root
+          services:
+            sysvinit:
+              cfn-hup:
+                enabled: 'true'
+                ensureRunning: 'true'
+                files:
+                  - /etc/cfn/cfn-hup.conf
+                  - /etc/cfn/hooks.d/cfn-auto-reloader.conf
+        setup_jenkins:
+          packages:
+            yum:
+              tmux: []
+              git: []
+              jq: []
+              python2-pip: []
+              python3: []
+              python3-devel: []
+              gcc: []
+
+          # sources:
+          #     /home/ec2-user/tarball: 'tarball'
+          files:
+            /tmp/install_docker.sh:
+              content: !Sub |
+                amazon-linux-extras install docker
+                service docker start
+                usermod -a -G docker ec2-user
+                usermod -a -G docker jenkins
+                sudo serivce jenkins restart
+                sudo systemctl enable docker
+            /tmp/install_python_packages.sh:
+              content: !Sub |
+                sudo pip install pandas
+                sudo pip install sagemaker
+                sudo pip install awscli
+                sudo pip install virtualenv
+            /tmp/clone_cookbooks_repo.sh:
+              content: !Sub |
+                git config --global core.sshCommand 'ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no'
+                aws secretsmanager get-secret-value --secret-id GitSSHPrivateKey --region ${AWS::Region} | jq .SecretString -r > /tmp/GitSSHPrivateKey
+                chmod 600 /tmp/GitSSHPrivateKey
+                eval `ssh-agent -s`
+                ssh-add /tmp/GitSSHPrivateKey
+                git clone ${JenkinsCookbookRepo} /opt/jenkins-cfn-chef
+                cd /opt/jenkins-cfn-chef/
+                git checkout ${GitBranch}
+            /tmp/env_vars:
+              content: !Sub |
+                export JENKINS_USER="${JenkinsUser}"
+                export JENKINS_PASSWORD=`aws secretsmanager get-secret-value --secret-id JenkinsPassword --region ${AWS::Region} | jq -r .SecretString`
+                export GIT_SSH_KEY_PRIV=`aws secretsmanager get-secret-value --secret-id GitSSHPrivateKey --region ${AWS::Region} | jq .SecretString`
+                export GIT_SSH_KEY_PUB=`aws secretsmanager get-secret-value --secret-id GitSSHPublicKey --region ${AWS::Region} | jq -r .SecretString`
+                export GIT_BRANCH="${GitBranch}"
+                export GIT_REPO="${GitRepo}"
+                export JENKINS_VERSION="${JenkinsVersion}"
+            /tmp/google-chrome76.rpm:
+              source: "https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm"
+              group: "root"
+              owner: "root"
+              mode: "000400"
+          commands:
+            01_download_chef:
+              command: "wget -O /tmp/chefdk.rpm https://packages.chef.io/files/stable/chefdk/3.7.23/el/7/chefdk-3.7.23-1.el7.x86_64.rpm"
+            02_install_chef:
+              command: "rpm -ivh /tmp/chefdk.rpm"
+            03_install_python_packages:
+              command: "sudo bash /tmp/install_python_packages.sh"
+            03_1_install_chrome:
+              command: "sudo yum install -y /tmp/google-chrome76.rpm"
+            04_clone_git_repo:
+              command: "sudo bash /tmp/clone_cookbooks_repo.sh"
+            05_chef_install_jenkins:
+              command: "sudo bash /opt/jenkins-cfn-chef/jenkins/install-jenkins.sh"
+            06_install_docker:
+              command: "sudo bash /tmp/install_docker.sh"
+    Properties:
+      ImageId: !Ref 'ImageId'
+      InstanceType: !Ref 'InstanceType'
+      IamInstanceProfile: !Ref 'JenkinsInstanceProfile'
+      SecurityGroupIds:
+        - !Ref 'JenkinsSecurityGroup'
+      SubnetId: !Ref InstanceSubnet
+      Monitoring: true
+      KeyName: !Ref 'KeyName'
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeType: "gp2"
+            VolumeSize: 100
+            Encrypted: true
+      UserData:
+        Fn::Base64: !Sub |
+
+            #!/bin/bash -xe
+
+              yum update -y aws-cfn-bootstrap
+
+              /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource Jenkins --configsets jenkins_install --region ${AWS::Region}
+              /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource Jenkins --region ${AWS::Region}
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-Jenkins"
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT30M
+
+  BuildArtifactsS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "build-artifacts-${AWS::Region}-${AWS::AccountId}"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+Outputs:
+  JenkinsUrl:
+    Value: !Join  ['', ['http://', !GetAtt 'JenkinsLoadBalancer.DNSName']]
+    Description: Jenkins Website
+  JenkinsLoadBalancer:
+    Description: A reference to the Application Load Balancer
+    Value: !Ref JenkinsLoadBalancer
+  JenkinsLoadBalancerUrl:
+    Description: The URL of the ALB
+    Value: !GetAtt JenkinsLoadBalancer.DNSName
+  JenkinsListener:
+    Description: A reference to a port 80 listener
+    Value: !Ref JenkinsLoadBalancerListener
+  BuildArtifactsBucket:
+    Description: Bucket for storing build artifacts
+    Value: !Ref BuildArtifactsS3Bucket
