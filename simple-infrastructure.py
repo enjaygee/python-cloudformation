@@ -47,3 +47,7 @@ def _setup_secrets_and_keys(api_token):
 def main(api_token):
     print(api_token)
     _setup_secrets_and_keys(api_token)
+
+
+if __name__ == '__main__':
+    main(*sys.argv[1:])
