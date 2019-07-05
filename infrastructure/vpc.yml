@@ -10,12 +10,12 @@ Parameters:
     Type: String
     AllowedValues:
       - prod
-      - test
+      - stage
       - dev
-      - services
+      - management
 Mappings:
   CIDRRanges:
-    services:
+    management:
       vpc: "10.192.10.0/20"
       public1: "10.192.10.0/24"
       public2: "10.192.11.0/24"
@@ -27,7 +27,7 @@ Mappings:
       public2: "10.193.11.0/24"
       private1: "10.193.12.0/24"
       private2: "10.193.13.0/24"
-    test:
+    stage:
       vpc: "10.194.10.0/20"
       public1: "10.194.10.0/24"
       public2: "10.194.11.0/24"
@@ -57,7 +57,7 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub ${EnvironmentName}-VPC
-        - Key: Envrionment
+        - Key: Environment
           Value: !Ref EnvironmentName
   InternetGateway:
     Type: AWS::EC2::InternetGateway
