@@ -21,15 +21,15 @@ Parameters:
     Type: String
     Description: Bastion ssh key name
     Default: BastionKey
-  RdsTemplateUrl:
-    Type: String
-    Description: Url for rds template stored in s3 bucket
-  DatabaseName:
-    Type: String
-    Description: Database name
-  DBMasterUsername:
-    Type: String
-    Description: DB master user name
+#  RdsTemplateUrl:
+#    Type: String
+#    Description: Url for rds template stored in s3 bucket
+#  DatabaseName:
+#    Type: String
+#    Description: Database name
+#  DBMasterUsername:
+#    Type: String
+#    Description: DB master user name
 #  JenkinsTemplateUrl:
 #    Type: String
 #    Description: Jenkins template stored in s3 bucket
@@ -172,42 +172,42 @@ Resources:
 #        GitRepo: !Ref GitRepo
 
   # RDS nested stacks
-  DevRDS:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Ref RdsTemplateUrl
-      Parameters:
-        EnvironmentName: dev
-        DatabaseName: !Ref DatabaseName
-        MasterUsername: !Ref DBMasterUsername
-        MasterUserPasswordSecretName: 'dev/RdsPassword'
-        VpcId: !GetAtt DevVPC.Outputs.VPC
-        Subnets: !GetAtt DevVPC.Outputs.PrivateSubnets
-        PubliclyAccessible: false
-  StageRDS:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Ref RdsTemplateUrl
-      Parameters:
-        EnvironmentName: stage
-        DatabaseName: !Ref DatabaseName
-        MasterUsername: !Ref DBMasterUsername
-        MasterUserPasswordSecretName: 'stage/RdsPassword'
-        VpcId: !GetAtt StageVPC.Outputs.VPC
-        Subnets: !GetAtt StageVPC.Outputs.PrivateSubnets
-        PubliclyAccessible: false
-  ProdRDS:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Ref RdsTemplateUrl
-      Parameters:
-        EnvironmentName: prod
-        DatabaseName: !Ref DatabaseName
-        MasterUsername: !Ref DBMasterUsername
-        MasterUserPasswordSecretName: 'prod/RdsPassword'
-        VpcId: !GetAtt ProdVPC.Outputs.VPC
-        Subnets: !GetAtt ProdVPC.Outputs.PrivateSubnets
-        PubliclyAccessible: false
+#  DevRDS:
+#    Type: AWS::CloudFormation::Stack
+#    Properties:
+#      TemplateURL: !Ref RdsTemplateUrl
+#      Parameters:
+#        EnvironmentName: dev
+#        DatabaseName: !Ref DatabaseName
+#        MasterUsername: !Ref DBMasterUsername
+#        MasterUserPasswordSecretName: 'dev/RdsPassword'
+#        VpcId: !GetAtt DevVPC.Outputs.VPC
+#        Subnets: !GetAtt DevVPC.Outputs.PrivateSubnets
+#        PubliclyAccessible: false
+#  StageRDS:
+#    Type: AWS::CloudFormation::Stack
+#    Properties:
+#      TemplateURL: !Ref RdsTemplateUrl
+#      Parameters:
+#        EnvironmentName: stage
+#        DatabaseName: !Ref DatabaseName
+#        MasterUsername: !Ref DBMasterUsername
+#        MasterUserPasswordSecretName: 'stage/RdsPassword'
+#        VpcId: !GetAtt StageVPC.Outputs.VPC
+#        Subnets: !GetAtt StageVPC.Outputs.PrivateSubnets
+#        PubliclyAccessible: false
+#  ProdRDS:
+#    Type: AWS::CloudFormation::Stack
+#    Properties:
+#      TemplateURL: !Ref RdsTemplateUrl
+#      Parameters:
+#        EnvironmentName: prod
+#        DatabaseName: !Ref DatabaseName
+#        MasterUsername: !Ref DBMasterUsername
+#        MasterUserPasswordSecretName: 'prod/RdsPassword'
+#        VpcId: !GetAtt ProdVPC.Outputs.VPC
+#        Subnets: !GetAtt ProdVPC.Outputs.PrivateSubnets
+#        PubliclyAccessible: false
 
   # ETL Resources nested stacks
 #  DevEtlResources:
@@ -338,9 +338,9 @@ Outputs:
 #  devSageMakerSecurityGroupId:
 #    Description: dev sagemaker security group id
 #    Value: !GetAtt DevSagemakerResources.Outputs.SageMakerSecurityGroupId
-  devRdsHost:
-    Description: dev RDS host
-    Value: !GetAtt DevRDS.Outputs.Host
+#  devRdsHost:
+#    Description: dev RDS host
+#    Value: !GetAtt DevRDS.Outputs.Host
   stagePrivateSubnet1:
     Description: stage private subnet 1
     Value: !GetAtt StageVPC.Outputs.PrivateSubnet1
@@ -362,9 +362,9 @@ Outputs:
 #  stageSageMakerSecurityGroupId:
 #    Description: stage sagemaker security group id
 #    Value: !GetAtt StageSagemakerResources.Outputs.SageMakerSecurityGroupId
-  stageRdsHost:
-    Description: stage RDS host
-    Value: !GetAtt StageRDS.Outputs.Host
+#  stageRdsHost:
+#    Description: stage RDS host
+#    Value: !GetAtt StageRDS.Outputs.Host
   prodPrivateSubnet1:
     Description: prod private subnet 1
     Value: !GetAtt ProdVPC.Outputs.PrivateSubnet1
@@ -386,9 +386,9 @@ Outputs:
 #  prodSageMakerSecurityGroupId:
 #    Description: prod sagemaker security group id
 #    Value: !GetAtt ProdSagemakerResources.Outputs.SageMakerSecurityGroupId
-  prodRdsHost:
-    Description: prod RDS host
-    Value: !GetAtt ProdRDS.Outputs.Host
+#  prodRdsHost:
+#    Description: prod RDS host
+#    Value: !GetAtt ProdRDS.Outputs.Host
 #  BuildArtifactsBucket:
 #    Description: build artifact bucket
 #    Value: !GetAtt Jenkins.Outputs.BuildArtifactsBucket
