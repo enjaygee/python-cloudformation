@@ -38,11 +38,14 @@ def _setup_secrets_and_keys():
       app_db_password_secret_name = env + '/' + rds_password_name
       awsutil.create_password(app_db_password_secret_name)
 
+def _setup_cfn_templates_bucket():
+    awsutil.deploy_stack('cfn-templates-bucket', 'infrastructure/cfn-templates-bucket.yml', [])
+
 def main():
     _setup_secrets_and_keys()
     # check formatting of all CloudFormation templates in the infrastructure directory
     awsutil.validate_cfn_templates('infrastructure')
-
+    _setup_cfn_templates_bucket()
 
 if __name__ == '__main__':
     main()
