@@ -8,9 +8,9 @@ Description: >
   It also deploys a Jenkins instance used for building CI/CD pipelines.
 
 Parameters:
-  VpcTemplateUrl:
+  VpcConditionalNatTemplateUrl:
     Type: String
-    Description: Url for vpc template stored in s3 bucket
+    Description: Url for vpc template (with environment-conditional NAT Gateways or NAT instances) stored in s3 bucket
   VpcPeeringTemplateUrl:
     Type: String
     Description: VPC peering template stored in s3 bucket
@@ -68,25 +68,25 @@ Resources:
   ManagementVPC:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Ref VpcTemplateUrl
+      TemplateURL: !Ref VpcConditionalNatTemplateUrl
       Parameters:
         EnvironmentName: management
   DevVPC:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Ref VpcTemplateUrl
+      TemplateURL: !Ref VpcConditionalNatTemplateUrl
       Parameters:
         EnvironmentName: dev
   StageVPC:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Ref VpcTemplateUrl
+      TemplateURL: !Ref VpcConditionalNatTemplateUrl
       Parameters:
         EnvironmentName: stage
   ProdVPC:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Ref VpcTemplateUrl
+      TemplateURL: !Ref VpcConditionalNatTemplateUrl
       Parameters:
         EnvironmentName: prod
 

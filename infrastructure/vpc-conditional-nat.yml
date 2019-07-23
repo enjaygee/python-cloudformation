@@ -1,0 +1,478 @@
+Description: >
+  This template deploys a VPC, with a pair of public and private subnets spread
+  across two Availabilty Zones. It deploys an Internet Gateway, with a default
+  route on the public subnets. It deploys a pair of NAT instances (one in each AZ),
+  and default routes for them in the private subnets.
+
+Parameters:
+  EnvironmentName:
+    Description: An environment name that will be prefixed to resource names
+    Type: String
+    AllowedValues:
+      - prod
+      - stage
+      - dev
+      - management
+Mappings:
+  CIDRRanges:
+    management:
+      vpc: "10.192.10.0/20"
+      public1: "10.192.10.0/24"
+      public2: "10.192.11.0/24"
+      private1: "10.192.12.0/24"
+      private2: "10.192.13.0/24"
+    dev:
+      vpc: "10.193.10.0/20"
+      public1: "10.193.10.0/24"
+      public2: "10.193.11.0/24"
+      private1: "10.193.12.0/24"
+      private2: "10.193.13.0/24"
+    stage:
+      vpc: "10.194.10.0/20"
+      public1: "10.194.10.0/24"
+      public2: "10.194.11.0/24"
+      private1: "10.194.12.0/24"
+      private2: "10.194.13.0/24"
+    prod:
+      vpc: "10.195.10.0/20"
+      public1: "10.195.10.0/24"
+      public2: "10.195.11.0/24"
+      private1: "10.195.12.0/24"
+      private2: "10.195.13.0/24"
+  AmazonLinuxAMI:
+    us-east-1:
+      AMI: ami-04681a1dbd79675a5    # N Virginia
+    us-east-2:
+      # AMI: ami-0cf31d971a3ca20d6    # Ohio
+      AMI: ami-0d8f6eb4f641ef691
+    us-west-1:
+      AMI: ami-0782017a917e973e7    # N California
+    us-west-2:
+      AMI: ami-6cd6f714             # Oregon
+
+Conditions:
+
+  CreateMultipleNatGateways: !Equals [ 'prod', !Ref EnvironmentName ]
+  CreateSingleNatGateway: !Or
+    - !Equals [ !Ref EnvironmentName, "stage" ]
+    - !Equals [ !Ref EnvironmentName, "management" ]
+  CreateOneOrMoreNatGateways: !Or
+    - !Equals [ !Ref EnvironmentName, "prod" ]
+    - !Equals [ !Ref EnvironmentName, "stage" ]
+    - !Equals [ !Ref EnvironmentName, "management" ]
+  CreateNatInstances: !Equals [ 'dev', !Ref EnvironmentName ]
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !FindInMap [CIDRRanges, !Ref EnvironmentName, "vpc"]
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-VPC
+        - Key: Environment
+          Value: !Ref EnvironmentName
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-IGW
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      CidrBlock: !FindInMap [CIDRRanges, !Ref EnvironmentName, "public1"]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Public Subnet (AZ1)
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      CidrBlock: !FindInMap [CIDRRanges, !Ref EnvironmentName, "public2"]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Public Subnet (AZ2)
+
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      CidrBlock: !FindInMap [CIDRRanges, !Ref EnvironmentName, "private1"]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Subnet (AZ1)
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      CidrBlock: !FindInMap [CIDRRanges, !Ref EnvironmentName, "private2"]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Subnet (AZ2)
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Public Routes
+        - Key: Environment
+          Value: !Ref EnvironmentName
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet1
+
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet2
+
+
+
+  PrivateRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Routes (AZ1)
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  PrivateRouteTable2:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Routes (AZ2)
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # If using single NAT Gateway:
+
+  DefaultSingleNatGatewayPrivateRoute1:
+    Condition: CreateSingleNatGateway
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NATGateway1
+
+  DefaultSingleNatGatewayPrivateRoute2:
+    Condition: CreateSingleNatGateway
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable2
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NATGateway1
+
+  # If using multiple NAT Gateways:
+
+  DefaultPrivateNatGatewayRoute1:
+    Condition: CreateMultipleNatGateways
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NATGateway1
+
+  DefaultPrivateNatGatewayRoute2:
+    Condition: CreateMultipleNatGateways
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable2
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NATGateway2
+
+
+  # If using NAT Instances:
+
+  DefaultPrivateNatInstanceRoute1:
+    Condition: CreateNatInstances
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      DestinationCidrBlock: 0.0.0.0/0
+      InstanceId: !Ref NATInstance1
+
+  DefaultPrivateNatInstanceRoute2:
+    Condition: CreateNatInstances
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable2
+      DestinationCidrBlock: 0.0.0.0/0
+      InstanceId: !Ref NATInstance2
+
+
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      SubnetId: !Ref PrivateSubnet1
+
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable2
+      SubnetId: !Ref PrivateSubnet2
+
+  NATSecurityGroup:
+      Type: AWS::EC2::SecurityGroup
+      DependsOn: InternetGatewayAttachment
+      Properties:
+        GroupName: !Sub ${EnvironmentName}-NATSecurityGroup
+        GroupDescription: Enable internal access to the NAT device
+        VpcId: !Ref VPC
+        SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '0'
+          ToPort: '65535'
+          CidrIp: 0.0.0.0/0
+        SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: '0'
+          ToPort: '65535'
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: udp
+          FromPort: '0'
+          ToPort: '65535'
+          CidrIp: 0.0.0.0/0
+
+
+
+
+  EIPNat1:
+    Condition: CreateOneOrMoreNatGateways
+    Type: 'AWS::EC2::EIP'
+    Properties:
+      Domain: vpc
+
+  NATGateway1:
+    Condition: CreateOneOrMoreNatGateways
+    Type: 'AWS::EC2::NatGateway'
+    DependsOn: PublicSubnet1
+    Properties:
+      AllocationId: !GetAtt EIPNat1.AllocationId
+      SubnetId: !Ref PublicSubnet1
+
+  EIPNat2:
+    Condition: CreateMultipleNatGateways
+    Type: 'AWS::EC2::EIP'
+    Properties:
+      Domain: vpc
+
+  NATGateway2:
+    Condition: CreateMultipleNatGateways
+    Type: 'AWS::EC2::NatGateway'
+    DependsOn: PublicSubnet2
+    Properties:
+      AllocationId: !GetAtt EIPNat1.AllocationId
+      SubnetId: !Ref PublicSubnet2
+
+
+  NATInstance1:
+    Condition: CreateNatInstances
+    Type: AWS::EC2::Instance
+    DependsOn: PublicSubnet1
+    Properties:
+      ImageId: !FindInMap [ AmazonLinuxAMI, !Ref "AWS::Region", AMI]
+      InstanceType: t2.small
+      NetworkInterfaces:
+      - DeviceIndex: '0'
+        SubnetId: !Ref PublicSubnet1
+        AssociatePublicIpAddress: true
+        GroupSet: [!Ref NATSecurityGroup]
+      SourceDestCheck: false
+      Tags:
+      - Key: Name
+        Value: !Sub ${EnvironmentName}-NAT-${AWS::StackName}
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum -y update
+          yum install -y aws-cfn-bootstrap
+          echo 1 > /proc/sys/net/ipv4/ip_forward
+          echo 0 > /proc/sys/net/ipv4/conf/eth0/send_redirects
+          /sbin/iptables -t nat -A POSTROUTING -o eth0 -s 0.0.0.0/0 -j MASQUERADE
+          /sbin/iptables-save > /etc/sysconfig/iptables
+          mkdir -p /etc/sysctl.d/
+          cat << NatConfFileMarker > /etc/sysctl.d/nat.conf
+          net.ipv4.ip_forward = 1
+          net.ipv4.conf.eth0.send_redirects = 0
+          NatConfFileMarker
+          /opt/aws/bin/cfn-signal -e 0 --resource NATInstance1 --stack ${AWS::StackName} --region ${AWS::Region}
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: PT5M
+
+  NATInstance2:
+    Condition: CreateNatInstances
+    Type: AWS::EC2::Instance
+    DependsOn: PublicSubnet2
+    Properties:
+      ImageId: !FindInMap [ AmazonLinuxAMI, !Ref "AWS::Region", AMI]
+      InstanceType: t2.small
+      NetworkInterfaces:
+      - DeviceIndex: '0'
+        SubnetId: !Ref PublicSubnet2
+        AssociatePublicIpAddress: true
+        GroupSet: [!Ref NATSecurityGroup]
+      SourceDestCheck: false
+      Tags:
+      - Key: Name
+        Value: !Sub ${EnvironmentName}-NAT-${AWS::StackName}
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum -y update
+          yum install -y aws-cfn-bootstrap
+          echo 1 > /proc/sys/net/ipv4/ip_forward
+          echo 0 > /proc/sys/net/ipv4/conf/eth0/send_redirects
+          /sbin/iptables -t nat -A POSTROUTING -o eth0 -s 0.0.0.0/0 -j MASQUERADE
+          /sbin/iptables-save > /etc/sysconfig/iptables
+          mkdir -p /etc/sysctl.d/
+          cat << NatConfFileMarker > /etc/sysctl.d/nat.conf
+          net.ipv4.ip_forward = 1
+          net.ipv4.conf.eth0.send_redirects = 0
+          NatConfFileMarker
+          /opt/aws/bin/cfn-signal -e 0 --resource NATInstance2 --stack ${AWS::StackName} --region ${AWS::Region}
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: PT5M
+
+  S3Endpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action:
+              - '*'
+            Resource:
+              - '*'
+      RouteTableIds:
+        - !Ref PublicRouteTable
+        - !Ref PrivateRouteTable1
+        - !Ref PrivateRouteTable2
+      ServiceName: !Join
+        - ''
+        - - com.amazonaws.
+          - !Ref 'AWS::Region'
+          - .s3
+      VpcId: !Ref VPC
+  FlowLogIAMRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "vpc-flow-logs.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: "/"
+      Policies:
+        -
+          PolicyName: "logs"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: "Allow"
+                Action:
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:DescribeLogGroups"
+                  - "logs:DescribeLogStreams"
+                  - "logs:PutLogEvents"
+                Resource: "*"
+
+  VPCFlowLog:
+    Type: "AWS::EC2::FlowLog"
+    Properties:
+      DeliverLogsPermissionArn : !GetAtt FlowLogIAMRole.Arn
+      LogGroupName : !Join [ "", [ "/aws/flowlogs/", !Ref VPC ]]
+      ResourceId : !Ref VPC
+      ResourceType : "VPC"
+      TrafficType : "ALL"
+
+Outputs:
+  VPC:
+    Description: A reference to the created VPC
+    Value: !Ref VPC
+
+  PublicSubnets:
+    Description: A list of the public subnets
+    Value: !Join [",", [!Ref PublicSubnet1, !Ref PublicSubnet2]]
+
+  PrivateSubnets:
+    Description: A list of the private subnets
+    Value: !Join [",", [!Ref PrivateSubnet1, !Ref PrivateSubnet2]]
+
+  PublicSubnet1:
+    Description: A reference to the public subnet in the 1st Availability Zone
+    Value: !Ref PublicSubnet1
+
+  PublicSubnet2:
+    Description: A reference to the public subnet in the 2nd Availability Zone
+    Value: !Ref PublicSubnet2
+
+  PrivateSubnet1:
+    Description: A reference to the private subnet in the 1st Availability Zone
+    Value: !Ref PrivateSubnet1
+
+  PrivateSubnet2:
+    Description: A reference to the private subnet in the 2nd Availability Zone
+    Value: !Ref PrivateSubnet2
+
+  PublicRouteTable:
+    Description: Route table for public subnets
+    Value: !Ref PublicRouteTable
+  PrivateRouteTable1:
+    Description: Route table for private subnet 1
+    Value: !Ref PrivateRouteTable1
+  PrivateRouteTable2:
+    Description: Route table for private subnet 2
+    Value: !Ref PrivateRouteTable2
+  VPCCIDR:
+    Description: CIDR block of VPC
+    Value: !GetAtt VPC.CidrBlock
