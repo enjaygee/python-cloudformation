@@ -68,7 +68,8 @@ def _setup_envs():
         s3.Bucket(cfn_templates_bucket).upload_file(cfn_template, object_key)
 
     # Create presigned URLs for access to CloudFormation templates in S3 template bucket
-    vpc_template_url = s3_client.generate_presigned_url('get_object', ExpiresIn=0, Params={'Bucket': cfn_templates_bucket, 'Key': 'vpc.yml'})
+    # vpc_template_url = s3_client.generate_presigned_url('get_object', ExpiresIn=0, Params={'Bucket': cfn_templates_bucket, 'Key': 'vpc.yml'})
+    vpc_conditional_nat_template_url = s3_client.generate_presigned_url('get_object', ExpiresIn=0, Params={'Bucket': cfn_templates_bucket, 'Key': 'vpc-conditional-nat.yml'})
     vpc_peering_template_url = s3_client.generate_presigned_url('get_object', ExpiresIn=0, Params={'Bucket': cfn_templates_bucket, 'Key': 'vpc-peering.yml'})
     bastion_template_url = s3_client.generate_presigned_url('get_object', ExpiresIn=0, Params={'Bucket': cfn_templates_bucket, 'Key': 'bastion.yml'})
     rds_template_url = s3_client.generate_presigned_url('get_object', ExpiresIn=0, Params={'Bucket': cfn_templates_bucket, 'Key': 'rds.yml'})
@@ -80,8 +81,8 @@ def _setup_envs():
 
     parameters = [
             {
-                'ParameterKey': 'VpcTemplateUrl',
-                'ParameterValue': vpc_template_url
+                'ParameterKey': 'VpcConditionalNatTemplateUrl',
+                'ParameterValue': vpc_conditional_nat_template_url
             },
             {
                 'ParameterKey': 'VpcPeeringTemplateUrl',
